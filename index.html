@@ -1,448 +1,79 @@
-<!DOCTYPE html>
-<html lang="id">
-<head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Web Komunikasi P2P Blockchain</title>
-    <style>
-        * {
-            margin: 0;
-            padding: 0;
-            box-sizing: border-box;
-            font-family: 'Arial', sans-serif;
-        }
+import React, { useState } from "react";
+import { Card, CardContent } from "@/components/ui/card";
+import { Button } from "@/components/ui/button";
 
-        body {
-            background: #f0f2f5;
-            height: 100vh;
-            display: flex;
-            flex-direction: column;
-            overflow: hidden;
-        }
+function sha256(input) {
+  const encoder = new TextEncoder();
+  const data = encoder.encode(input);
+  return crypto.subtle.digest("SHA-256", data).then((hash) => {
+    let hex = "";
+    const view = new DataView(hash);
+    for (let i = 0; i < view.byteLength; i += 4) {
+      hex += ("00000000" + view.getUint32(i).toString(16)).slice(-8);
+    }
+    return hex;
+  });
+}
 
-        .container {
-            display: flex;
-            height: 100vh;
-        }
+function generateVariations(input, count = 1000) {
+  const variations = [];
+  for (let i = 0; i < count; i++) {
+    variations.push(input + Math.floor(Math.random() * 1e9).toString());
+  }
+  return variations;
+}
 
-        .sidebar {
-            width: 300px;
-            background: #fff;
-            border-right: 1px solid #ddd;
-            display: flex;
-            flex-direction: column;
-            padding: 10px;
-        }
+function scoreHash(hash, original) {
+  let score = 0;
+  for (let char of original) {
+    if (hash.includes(char)) score++;
+  }
+  return score;
+}
 
-        .sidebar-header {
-            display: flex;
-            justify-content: space-between;
-            align-items: center;
-            padding: 10px;
-            border-bottom: 1px solid #ddd;
-        }
+export default function SHA256QuantumSimulator() {
+  const [input, setInput] = useState("");
+  const [bestResult, setBestResult] = useState(null);
+  const [loading, setLoading] = useState(false);
 
-        .sidebar-header h2 {
-            font-size: 16px;
-            color: #333;
-        }
+  const handleProcess = async () => {
+    setLoading(true);
+    const variations = generateVariations(input);
+    const hashes = await Promise.all(
+      variations.map(async (v) => {
+        const hash = await sha256(v);
+        const score = scoreHash(hash, input);
+        return { input: v, hash, score };
+      })
+    );
+    hashes.sort((a, b) => b.score - a.score);
+    setBestResult(hashes[0]);
+    setLoading(false);
+  };
 
-        .login-btn, .logout-btn {
-            background: #0088cc;
-            color: #fff;
-            border: none;
-            padding: 5px 10px;
-            border-radius: 3px;
-            cursor: pointer;
-            font-size: 12px;
-        }
+  return (
+    <div className="p-4 space-y-4">
+      <h1 className="text-2xl font-bold">Simulasi SHA-256 + Kuantum Sorting</h1>
+      <input
+        type="text"
+        className="border p-2 w-full rounded"
+        placeholder="Masukkan kode atau angka acak"
+        value={input}
+        onChange={(e) => setInput(e.target.value)}
+      />
+      <Button onClick={handleProcess} disabled={loading}>
+        {loading ? "Memproses..." : "Proses SHA-256 + Simulasi Kuantum"}
+      </Button>
 
-        .login-btn:hover, .logout-btn:hover {
-            background: #006b9e;
-        }
-
-        .user-info {
-            padding: 10px;
-            font-size: 14px;
-            color: #555;
-            border-bottom: 1px solid #ddd;
-        }
-
-        .search {
-            padding: 10px;
-            display: flex;
-            gap: 5px;
-        }
-
-        .search input {
-            flex: 1;
-            padding: 5px;
-            border: 1px solid #ddd;
-            border-radius: 3px;
-            font-size: 12px;
-        }
-
-        .search button {
-            background: #0088cc;
-            color: #fff;
-            border: none;
-            padding: 5px 10px;
-            border-radius: 3px;
-            cursor: pointer;
-            font-size: 12px;
-        }
-
-        .search button:hover {
-            background: #006b9e;
-        }
-
-        .contacts {
-            flex: 1;
-            overflow-y: auto;
-        }
-
-        .contact {
-            padding: 10px;
-            border-bottom: 1px solid #ddd;
-            cursor: pointer;
-            display: flex;
-            align-items: center;
-            gap: 10px;
-        }
-
-        .contact:hover {
-            background: #f5f5f5;
-        }
-
-        .contact-id {
-            font-size: 14px;
-            color: #333;
-        }
-
-        .chat-area {
-            flex: 1;
-            display: flex;
-            flex-direction: column;
-        }
-
-        .chat-header {
-            background: #fff;
-            padding: 10px;
-            border-bottom: 1px solid #ddd;
-            display: flex;
-            align-items: center;
-            gap: 10px;
-        }
-
-        .chat-header h2 {
-            font-size: 16px;
-            color: #333;
-        }
-
-        .chat-messages {
-            flex: 1;
-            background: #e5ddd5;
-            padding: 10px;
-            overflow-y: auto;
-            display: flex;
-            flex-direction: column;
-            gap: 10px;
-        }
-
-        .message {
-            max-width: 70%;
-            padding: 8px;
-            border-radius: 8px;
-            font-size: 14px;
-        }
-
-        .message.sent {
-            background: #0088cc;
-            color: #fff;
-            align-self: flex-end;
-        }
-
-        .message.received {
-            background: #fff;
-            color: #333;
-            align-self: flex-start;
-        }
-
-        .chat-input {
-            background: #fff;
-            padding: 10px;
-            display: flex;
-            gap: 10px;
-            border-top: 1px solid #ddd;
-        }
-
-        .chat-input input {
-            flex: 1;
-            padding: 8px;
-            border: 1px solid #ddd;
-            border-radius: 3px;
-            font-size: 14px;
-        }
-
-        .chat-input button {
-            background: #0088cc;
-            color: #fff;
-            border: none;
-            padding: 8px 15px;
-            border-radius: 3px;
-            cursor: pointer;
-            font-size: 14px;
-        }
-
-        .chat-input button:hover {
-            background: #006b9e;
-        }
-
-        @media (max-width: 768px) {
-            .container {
-                flex-direction: column;
-            }
-
-            .sidebar {
-                width: 100%;
-                height: 200px;
-            }
-
-            .chat-area {
-                flex: 1;
-            }
-        }
-    </style>
-</head>
-<body>
-    <div class="container">
-        <div class="sidebar">
-            <div class="sidebar-header">
-                <h2>Chats</h2>
-                <button class="login-btn" id="loginBtn">Login</button>
-                <button class="logout-btn" id="logoutBtn" style="display: none;">Logout</button>
-            </div>
-            <div class="user-info" id="userInfo">Mode Samaran: ID <span id="userId"></span></div>
-            <div class="search">
-                <input type="text" id="searchId" placeholder="Cari ID pengguna...">
-                <button onclick="searchUser()">Cari</button>
-            </div>
-            <div class="contacts" id="contacts"></div>
-        </div>
-        <div class="chat-area">
-            <div class="chat-header">
-                <h2 id="chatHeader">Pilih kontak untuk memulai obrolan</h2>
-            </div>
-            <div class="chat-messages" id="chatMessages"></div>
-            <div class="chat-input">
-                <input type="text" id="messageInput" placeholder="Ketik pesan...">
-                <button onclick="sendMessage()">Kirim</button>
-            </div>
-        </div>
+      {bestResult && (
+        <Card>
+          <CardContent className="p-4 space-y-2">
+            <p><strong>Input terbaik:</strong> {bestResult.input}</p>
+            <p><strong>Hash SHA-256:</strong> {bestResult.hash}</p>
+            <p><strong>Skor relevansi:</strong> {bestResult.score}</p>
+          </CardContent>
+        </Card>
+      )}
     </div>
-
-    <!-- Firebase SDK -->
-    <script src="https://www.gstatic.com/firebasejs/9.22.0/firebase-app-compat.js"></script>
-    <script src="https://www.gstatic.com/firebasejs/9.22.0/firebase-auth-compat.js"></script>
-
-    <!-- PeerJS -->
-    <script src="https://unpkg.com/peerjs@1.5.2/dist/peerjs.min.js"></script>
-
-    <!-- Ethers.js -->
-    <script src="https://cdn.ethers.io/lib/ethers-5.7.umd.min.js"></script>
-
-    <script>
-        // Firebase Configuration
-        const firebaseConfig = {
-            apiKey: "YOUR_FIREBASE_API_KEY",
-            authDomain: "YOUR_FIREBASE_AUTH_DOMAIN",
-            projectId: "YOUR_FIREBASE_PROJECT_ID",
-            storageBucket: "YOUR_FIREBASE_STORAGE_BUCKET",
-            messagingSenderId: "YOUR_FIREBASE_MESSAGING_SENDER_ID",
-            appId: "YOUR_FIREBASE_APP_ID"
-        };
-
-        // Initialize Firebase
-        const app = firebase.initializeApp(firebaseConfig);
-        const auth = firebase.auth();
-
-        // PeerJS Setup
-        let peer = null;
-        let connections = [];
-        let currentChatId = null;
-        let userId = null;
-        let isLoggedIn = false;
-
-        // Blockchain Setup (Ethereum Testnet - Sepolia)
-        const provider = new ethers.providers.Web3Provider(window.ethereum);
-        const signer = provider.getSigner();
-        const contractAddress = "YOUR_CONTRACT_ADDRESS"; // Ganti dengan alamat kontrak Anda
-        const contractABI = [
-            "function registerUser(string memory email) public returns (uint256)",
-            "function getUserId(string memory email) public view returns (uint256)",
-            "function getTotalUsers() public view returns (uint256)"
-        ];
-        const contract = new ethers.Contract(contractAddress, contractABI, signer);
-
-        // Generate Random ID for Anonymous Mode
-        function generateRandomId() {
-            return Math.floor(Math.random() * 1000000) + 100000;
-        }
-
-        // Initialize PeerJS and User ID
-        function initializePeer() {
-            if (isLoggedIn) {
-                // Untuk pengguna yang login, ID diambil dari blockchain
-                auth.onAuthStateChanged(async (user) => {
-                    if (user) {
-                        const email = user.email;
-                        let userIdFromContract = await contract.getUserId(email);
-                        if (userIdFromContract.toNumber() === 0) {
-                            // Pengguna belum terdaftar, daftarkan
-                            const tx = await contract.registerUser(email);
-                            await tx.wait();
-                            userIdFromContract = await contract.getUserId(email);
-                        }
-                        userId = userIdFromContract.toNumber();
-                        document.getElementById('userInfo').innerText = `ID Anda: ${userId}`;
-                        initializePeerConnection();
-                    }
-                });
-            } else {
-                // Untuk mode samaran, buat ID acak
-                userId = generateRandomId();
-                document.getElementById('userInfo').innerText = `Mode Samaran: ID ${userId}`;
-                initializePeerConnection();
-            }
-        }
-
-        function initializePeerConnection() {
-            peer = new Peer(userId.toString());
-            peer.on('open', (id) => {
-                console.log('Peer ID:', id);
-            });
-
-            peer.on('connection', (conn) => {
-                connections.push(conn);
-                conn.on('data', (data) => {
-                    const decryptedMessage = decryptMessage(data.message, data.key);
-                    displayMessage(decryptedMessage, 'received', conn.peer);
-                });
-            });
-        }
-
-        // Login/Logout Functionality
-        document.getElementById('loginBtn').addEventListener('click', () => {
-            const provider = new firebase.auth.GoogleAuthProvider();
-            auth.signInWithPopup(provider).then((result) => {
-                isLoggedIn = true;
-                document.getElementById('loginBtn').style.display = 'none';
-                document.getElementById('logoutBtn').style.display = 'block';
-                initializePeer();
-            }).catch((error) => {
-                console.error('Login Error:', error);
-                alert('Gagal login. Silakan coba lagi.');
-            });
-        });
-
-        document.getElementById('logoutBtn').addEventListener('click', () => {
-            auth.signOut().then(() => {
-                isLoggedIn = false;
-                document.getElementById('loginBtn').style.display = 'block';
-                document.getElementById('logoutBtn').style.display = 'none';
-                userId = generateRandomId();
-                document.getElementById('userInfo').innerText = `Mode Samaran: ID ${userId}`;
-                peer.destroy();
-                connections = [];
-                initializePeer();
-            });
-        });
-
-        // Search User by ID
-        async function searchUser() {
-            const searchId = document.getElementById('searchId').value.trim();
-            if (!searchId) {
-                alert('Masukkan ID pengguna untuk mencari.');
-                return;
-            }
-
-            const contactList = document.getElementById('contacts');
-            const contactDiv = document.createElement('div');
-            contactDiv.className = 'contact';
-            contactDiv.innerHTML = `<span class="contact-id">ID: ${searchId}</span>`;
-            contactDiv.onclick = () => startChat(searchId);
-            contactList.appendChild(contactDiv);
-        }
-
-        // Start Chat with a User
-        function startChat(targetId) {
-            currentChatId = targetId;
-            document.getElementById('chatHeader').innerText = `Obrolan dengan ID ${targetId}`;
-            document.getElementById('chatMessages').innerHTML = '';
-
-            const conn = peer.connect(targetId);
-            conn.on('open', () => {
-                connections.push(conn);
-            });
-
-            conn.on('data', (data) => {
-                const decryptedMessage = decryptMessage(data.message, data.key);
-                displayMessage(decryptedMessage, 'received', targetId);
-            });
-        }
-
-        // Send Message
-        function sendMessage() {
-            const messageInput = document.getElementById('messageInput');
-            const message = messageInput.value.trim();
-            if (!message || !currentChatId) return;
-
-            const key = generateKey();
-            const encryptedMessage = encryptMessage(message, key);
-
-            connections.forEach((conn) => {
-                if (conn.peer === currentChatId) {
-                    conn.send({ message: encryptedMessage, key: key });
-                }
-            });
-
-            displayMessage(message, 'sent', currentChatId);
-            messageInput.value = '';
-        }
-
-        // Display Message in Chat
-        function displayMessage(message, type, fromId) {
-            const chatMessages = document.getElementById('chatMessages');
-            const messageDiv = document.createElement('div');
-            messageDiv.className = `message ${type}`;
-            messageDiv.innerText = message;
-            chatMessages.appendChild(messageDiv);
-            chatMessages.scrollTop = chatMessages.scrollHeight;
-        }
-
-        // Simple Encryption/Decryption (for demo purposes)
-        function generateKey() {
-            return Math.random().toString(36).substring(2, 15);
-        }
-
-        function encryptMessage(message, key) {
-            let encrypted = '';
-            for (let i = 0; i < message.length; i++) {
-                encrypted += String.fromCharCode(message.charCodeAt(i) ^ key.charCodeAt(i % key.length));
-            }
-            return encrypted;
-        }
-
-        function decryptMessage(encrypted, key) {
-            let decrypted = '';
-            for (let i = 0; i < encrypted.length; i++) {
-                decrypted += String.fromCharCode(encrypted.charCodeAt(i) ^ key.charCodeAt(i % key.length));
-            }
-            return decrypted;
-        }
-
-        // Initialize on Page Load
-        initializePeer();
-    </script>
-</body>
-</html>
+  );
+}
